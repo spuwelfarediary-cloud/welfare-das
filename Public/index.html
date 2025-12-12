@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Automation System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            serverTimestamp, 
+            onSnapshot, 
+            query, 
+            orderBy, 
+            deleteDoc, 
+            doc
+        } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpaMthWl0eQwYXN-wt09fv_OqS4iUVxLA",
+            authDomain: "welfare-das.firebaseapp.com",
+            projectId: "welfare-das",
+            storageBucket: "welfare-das.firebasestorage.app",
+            messagingSenderId: "783240912416",
+            appId: "1:783240912416:web:86c8b859e1b7162d0aa645",
+            measurementId: "G-FGRCLWVY6B"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        window.firebaseModules = {
+            db,
+            collection,
+            addDoc,
+            serverTimestamp,
+            onSnapshot,
+            query,
+            orderBy,
+            deleteDoc,
+            doc
+        };
+        console.log("✅ Firebase initialized successfully!");
+    </script>
+    
+    <!-- Docx Libraries -->
+    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.47.0/docxtemplater.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+    <style>
+        body { background-color: #e9ecef; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .container { max-width: 1200px; margin: 30px auto; }
+        .form-section, .dashboard-section { background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); margin-bottom: 30px; }
+        .calculated-field { font-weight: bold; color: #007bff; background-color: #f0f8ff; border-radius: 5px; padding: 8px; }
+        .date-group { border: 1px solid #ddd; margin-top: 15px; padding: 15px; border-radius: 8px; background-color: #fafafa; }
+        .date-header { display: flex; justify-content: space-between; align-items: center; background-color: #e2e6ea; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+        .date-header h5 { margin: 0; color: #333; }
+        .loading { display: none; }
+        .spinner-border { width: 1rem; height: 1rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="text-center text-primary mb-5">✅ Document Automation System</h1>
+        
+        <div class="form-section">
+            <h3 class="mb-4 text-success">📝 New Application Entry (Form)</h3>
+            <form id="advanceForm" oninput="updateCalculations()">
+                
+                <div class="row g-3">
+                    <div class="col-md-6"><label for="applicantName" class="form-label">Applicant Name</label><input type="text" class="form-control" id="applicantName" required></div>
+                    <div class="col-md-6"><label for="rank" class="form-label">Rank / Designation</label><input type="text" class="form-control" id="rank" required></div>
+                    <div class="col-md-4"><label for="beltNo" class="form-label">Belt No</label><input type="text" class="form-control" id="beltNo" required></div>
+                    <div class="col-md-4"><label for="cnic" class="form-label">CNIC Number</label><input type="text" class="form-control" id="cnic" maxlength="15" required onkeyup="validateCNIC(this)"></div>
+                    <div class="col-md-4"><label for="gpFundNo" class="form-label">GP Fund Account No</label><input type="text" class="form-control" id="gpFundNo" required></div>
+                </div>
+                
+                <hr class="my-4">
+
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="totalBalance" class="form-label">Total GP Balance (PKR)</label>
+                        <input type="number" class="form-control" id="totalBalance" min="1" step="1" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Withdrawal Amount (PKR)</label>
+                        <div id="advanceAmountDisplay" class="form-control calculated-field">0</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Installments (Months)</label>
+                        <div id="installmentsDisplay" class="form-control calculated-field">0</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Monthly Installment (PKR)</label>
+                        <div id="monthlyInstallment" class="form-control calculated-field">0</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Withdrawal Amount (Words)</label>
+                        <div id="advanceAmountWords" class="form-control calculated-field text-danger">Zero Only</div>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="advanceAmount" value="0"> 
+                <input type="hidden" id="installments" value="0">
+                <input type="hidden" id="monthlyInstallmentValue" value="0">
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="button" class="btn btn-success btn-lg" id="submitBtn" onclick="saveToFirestore()">
+                        <span id="submitText">Submit Data to Firestore</span>
+                        <span class="loading" id="submitLoading">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Saving...
+                        </span>
+                    </button>
+                    
+                    <button type="button" class="btn btn-primary btn-lg mt-2" id="downloadBtn" onclick="generateDocx()">
+                        <span id="downloadText">Download DOCX File</span>
+                        <span class="loading" id="downloadLoading">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Generating...
+                        </span>
+                    </button>
+                </div>
+                
+            </form>
+        </div>
+
+        <div class="dashboard-section">
+            <h3 class="mb-4 text-secondary">📊 Applications Dashboard</h3>
+            
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <button class="btn btn-info w-100" onclick="exportAllToDocx()">
+                        Export All DOCX
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-warning w-100" onclick="exportToExcel()">
+                        Export to Excel
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-secondary w-100" onclick="clearForm()">
+                        Clear Form
+                    </button>
+                </div>
+            </div>
+
+            <hr>
+            
+            <h4 class="mt-4">Daily Entries List</h4>
+            <div id="dailyDashboard">
+                <p class="text-center text-muted">Loading applications...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script>
+        // =========================================================
+        // 1. CORE LOGIC & CONSTANTS
+        // =========================================================
+        const CONSTANTS = {
+            MIN_INSTALLMENTS: 28,
+            MAX_INSTALLMENTS: 36,
+            MIN_PERCENTAGE: 0.75,
+            MAX_PERCENTAGE: 0.80
+        };
+
+        let currentFormData = null;
+        let allApplications = [];
+        
+        // =========================================================
+        // 2. CALCULATION FUNCTIONS
+        // =========================================================
+        function numberToWordsPakistani(n) {
+            if (n === 0) return "Zero Only";
+            if (n < 0) return "Negative " + numberToWordsPakistani(-n);
+            
+            const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+            const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+            const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+            
+            function convertHundreds(num) {
+                let result = "";
+                if (num >= 100) {
+                    result += ones[Math.floor(num / 100)] + " Hundred ";
+                    num %= 100;
+                }
+                if (num >= 20) {
+                    result += tens[Math.floor(num / 10)] + " ";
+                    num %= 10;
+                } else if (num >= 10) {
+                    result += teens[num - 10] + " ";
+                    num = 0;
+                }
+                if (num > 0) {
+                    result += ones[num] + " ";
+                }
+                return result.trim();
+            }
+            
+            let result = "";
+            let num = Math.floor(n);
+            
+            if (num >= 10000000) {
+                result += convertHundreds(Math.floor(num / 10000000)) + " Crore ";
+                num %= 10000000;
+            }
+            
+            if (num >= 100000) {
+                result += convertHundreds(Math.floor(num / 100000)) + " Lakh ";
+                num %= 100000;
+            }
+            
+            if (num >= 1000) {
+                result += convertHundreds(Math.floor(num / 1000)) + " Thousand ";
+                num %= 1000;
+            }
+            
+            result += convertHundreds(num);
+            
+            return result.trim() + " Only";
+        }
+
+        function calculateOptimalAdvance(balance) {
+            if (balance <= 0) return { advance: 0, installments: 0, monthly: 0, percentage: 0 };
+
+            const minAllowed = Math.ceil(balance * CONSTANTS.MIN_PERCENTAGE);
+            const maxAllowed = Math.floor(balance * CONSTANTS.MAX_PERCENTAGE);
+
+            for (let withdrawal = maxAllowed; withdrawal >= minAllowed; withdrawal--) {
+                for (let months = CONSTANTS.MAX_INSTALLMENTS; months >= CONSTANTS.MIN_INSTALLMENTS; months--) {
+                    const monthly = withdrawal / months;
+                    if (Number.isInteger(monthly) && monthly >= 1) {
+                        return {
+                            advance: withdrawal,
+                            installments: months,
+                            monthly: monthly,
+                            percentage: ((withdrawal / balance) * 100).toFixed(2)
+                        };
+                    }
+                }
+            }
+            return { advance: 0, installments: 0, monthly: 0, percentage: 0 };
+        }
+
+        function updateCalculations() {
+            const balance = parseInt(document.getElementById('totalBalance').value) || 0;
+            const result = calculateOptimalAdvance(balance);
+            
+            document.getElementById('advanceAmountDisplay').textContent = result.advance.toLocaleString('en-PK');
+            document.getElementById('installmentsDisplay').textContent = result.installments;
+            document.getElementById('monthlyInstallment').textContent = result.monthly.toLocaleString('en-PK');
+            document.getElementById('advanceAmountWords').textContent = numberToWordsPakistani(result.advance);
+
+            document.getElementById('advanceAmount').value = result.advance;
+            document.getElementById('installments').value = result.installments;
+            document.getElementById('monthlyInstallmentValue').value = result.monthly;
+            
+            // Store current form data
+            currentFormData = {
+                applicantName: document.getElementById('applicantName').value || '',
+                rank: document.getElementById('rank').value || '',
+                beltNo: document.getElementById('beltNo').value || '',
+                cnic: document.getElementById('cnic').value || '',
+                gpFundNo: document.getElementById('gpFundNo').value || '',
+                totalBalance: balance,
+                advanceAmount: result.advance,
+                installments: result.installments,
+                monthlyInstallment: result.monthly,
+                amountWords: numberToWordsPakistani(result.advance),
+                percentage: result.percentage
+            };
+        }
+
+        function validateCNIC(input) {
+            const cnicPattern = /^\d{5}-\d{7}-\d{1}$/;
+            let value = input.value.replace(/[^\d]/g, '');
+            
+            if (value.length > 0) {
+                if (value.length <= 5) {
+                    input.value = value;
+                } else if (value.length <= 12) {
+                    input.value = value.slice(0, 5) + '-' + value.slice(5);
+                } else {
+                    input.value = value.slice(0, 5) + '-' + value.slice(5, 12) + '-' + value.slice(12, 13);
+                }
+            }
+            
+            input.classList.toggle('is-invalid', !cnicPattern.test(input.value) && input.value.length > 0);
+        }
+
+        // =========================================================
+        // 3. DOCUMENT GENERATION WITH YOUR TEMPLATE
+        // =========================================================
+        async function generateDocx() {
+            if (!currentFormData || !currentFormData.applicantName) {
+                alert("Please fill the form first.");
+                return;
+            }
+
+            document.getElementById('downloadText').style.display = 'none';
+            document.getElementById('downloadLoading').style.display = 'inline';
+            document.getElementById('downloadBtn').disabled = true;
+
+            try {
+                // Try to fetch template
+                const response = await fetch('template.docx?v=' + new Date().getTime());
+                
+                if (!response.ok) {
+                    throw new Error("Template file not found. Please ensure template.docx is in the same folder.");
+                }
+                
+                const content = await response.arrayBuffer();
+                const zip = new PizZip(content);
+                
+                // Configure docxtemplater
+                const doc = new docxtemplater(zip, { 
+                    paragraphLoop: true, 
+                    linebreaks: true,
+                    parser: function(tag) {
+                        return {
+                            get: function(scope) {
+                                // Convert single braces to double braces for your template
+                                if (scope.hasOwnProperty(tag)) {
+                                    return scope[tag];
+                                }
+                                return '';
+                            }
+                        };
+                    }
+                });
+
+                const today = new Date();
+                const exportData = {
+                    // Your template variables
+                    AdvanceAmount: currentFormData.advanceAmount.toLocaleString('en-PK'),
+                    AmountWords: currentFormData.amountWords,
+                    ApplicantName: currentFormData.applicantName,
+                    Rank: currentFormData.rank,
+                    BeltNo: currentFormData.beltNo,
+                    AccountNo: currentFormData.gpFundNo,
+                    CNIC: currentFormData.cnic,
+                    Percentage: currentFormData.percentage,
+                    TotalBalance: currentFormData.totalBalance.toLocaleString('en-PK'),
+                    MonthlyInstallment: currentFormData.monthlyInstallment.toLocaleString('en-PK'),
+                    Installments: currentFormData.installments,
+                    // Date fields
+                    CurrentDate: today.toLocaleDateString('en-GB'),
+                    Day: today.getDate(),
+                    Month: today.toLocaleString('en-US', { month: 'long' }),
+                    Year: today.getFullYear()
+                };
+
+                doc.setData(exportData);
+                
+                try {
+                    doc.render();
+                } catch (renderError) {
+                    console.error("Render error:", renderError);
+                    // Try alternative template format
+                    await tryAlternativeTemplate(currentFormData, today);
+                    return;
+                }
+
+                const out = doc.getZip().generate({
+                    type: "blob",
+                    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                });
+
+                const fileName = `GP_Advance_${currentFormData.applicantName.replace(/\s/g, '_')}.docx`;
+                saveAs(out, fileName);
+                
+                alert("✅ Word file downloaded successfully!");
+                
+            } catch (error) {
+                console.error("DOCX Generation Error:", error);
+                
+                // Fallback: Create a simple text file
+                createFallbackDocument(currentFormData);
+                
+            } finally {
+                document.getElementById('downloadText').style.display = 'inline';
+                document.getElementById('downloadLoading').style.display = 'none';
+                document.getElementById('downloadBtn').disabled = false;
+            }
+        }
+
+        async function tryAlternativeTemplate(data, date) {
+            // Create a simple template if main template fails
+            const simpleTemplate = `
+Government of the Punjab
+Police Department
+
+No. /Acct/SPU Dated ${date.toLocaleDateString('en-GB')}
+
+ORDER:
+
+In exercise of the powers vested in me under Rule.1.14(1)(a)(iv)(d)(i)
+of the Punjab Provident Fund Rules, 1978, sanction is hereby accorded to
+the grant of refundable advance of Rs. ${data.advanceAmount.toLocaleString('en-PK')}/-
+(Rupees ${data.amountWords}) in respect of Mr. ${data.applicantName} ${data.rank} ${data.beltNo} of
+Special Protection Unit (SPU) Punjab Lahore from his G.P. Fund Account
+as mentioned in his G.P. Fund/Personal Account No. ${data.gpFundNo} and CNIC
+No. ${data.cnic} For construction/repairing of his house. The amount is
+approximately equal to ${data.percentage}% of the balance at his credit in his
+G.P. Fund account Rs. ${data.totalBalance.toLocaleString('en-PK')}/-.
+
+2. The recovery of the advance shall be made at the rate of Rs.
+${data.monthlyInstallment.toLocaleString('en-PK')}/- in ${data.installments} equal installments from the pay
+of subscriber which will commence from the pay of the month following
+the month in which the advance is drawn.
+
+3. It is certified that there is sufficient balance at his credit to
+meet the advance. The amount of advance is debatable under head
+G-Liabilities-G06-Trust Account Fund-G061-Provident Fund-G06103-General
+Provident Fund (Civil)-LO5635.
+
+Additional Director Admin/DDO,
+for Director/Deputy Inspector General of Police,
+Special Protection Unit,
+Punjab, Lahore.
+            `;
+            
+            const blob = new Blob([simpleTemplate], { type: 'text/plain' });
+            const fileName = `GP_Advance_${data.applicantName.replace(/\s/g, '_')}.txt`;
+            saveAs(blob, fileName);
+            alert("⚠️ Generated text file (template issue). Check console for details.");
+        }
+
+        function createFallbackDocument(data) {
+            const today = new Date();
+            const content = `
+GP Fund Advance Application
+===========================
+
+Applicant: ${data.applicantName}
+Rank: ${data.rank}
+Belt No: ${data.beltNo}
+CNIC: ${data.cnic}
+GP Fund Account: ${data.gpFundNo}
+
+Advance Amount: PKR ${data.advanceAmount.toLocaleString('en-PK')}
+Amount in Words: ${data.amountWords}
+Total Balance: PKR ${data.totalBalance.toLocaleString('en-PK')}
+Percentage: ${data.percentage}%
+
+Installments: ${data.installments} months
+Monthly: PKR ${data.monthlyInstallment.toLocaleString('en-PK')}
+
+Date: ${today.toLocaleDateString('en-GB')}
+            `;
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const fileName = `GP_Advance_${data.applicantName.replace(/\s/g, '_')}.txt`;
+            saveAs(blob, fileName);
+            alert("⚠️ Generated text file due to template error. Check browser console.");
+        }
+
+        // =========================================================
+        // 4. FIRESTORE OPERATIONS
+        // =========================================================
+        async function saveToFirestore() {
+            if (!window.firebaseModules) {
+                alert("Firebase is not initialized. Please wait...");
+                return;
+            }
+
+            const form = document.getElementById('advanceForm');
+            if (!form.checkValidity() || document.getElementById('cnic').classList.contains('is-invalid')) {
+                form.classList.add('was-validated');
+                alert("Please fill all required fields correctly.");
+                return;
+            }
+
+            const balance = parseInt(document.getElementById('totalBalance').value) || 0;
+            const result = calculateOptimalAdvance(balance);
+            
+            if (result.advance === 0) {
+                alert("Calculation Error: Could not calculate valid advance amount.");
+                return;
+            }
+
+            document.getElementById('submitText').style.display = 'none';
+            document.getElementById('submitLoading').style.display = 'inline';
+            document.getElementById('submitBtn').disabled = true;
+
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            
+            const applicationData = {
+                applicantName: document.getElementById('applicantName').value.trim(),
+                rank: document.getElementById('rank').value.trim(),
+                beltNo: document.getElementById('beltNo').value.trim(),
+                cnic: document.getElementById('cnic').value.trim(),
+                gpFundNo: document.getElementById('gpFundNo').value.trim(),
+                totalBalance: balance,
+                advanceAmount: result.advance,
+                installments: result.installments,
+                monthlyInstallment: result.monthly,
+                amountWords: numberToWordsPakistani(result.advance),
+                percentage: result.percentage,
+                createdAt: window.firebaseModules.serverTimestamp(),
+                submittedDate: todayStr,
+                status: 'active',
+                timestamp: today.getTime()
+            };
+
+            try {
+                const { db, addDoc, collection } = window.firebaseModules;
+                const applicationsRef = collection(db, "applications");
+                
+                const docRef = await addDoc(applicationsRef, applicationData);
+                console.log("✅ Document saved with ID: ", docRef.id);
+                
+                currentFormData = applicationData;
+                
+                form.reset();
+                updateCalculations();
+                loadDashboard();
+                
+                alert('✅ Application saved to Firestore!');
+                
+            } catch (error) {
+                console.error("❌ Error saving document: ", error);
+                alert('❌ Error saving to Firestore: ' + error.message);
+            } finally {
+                document.getElementById('submitText').style.display = 'inline';
+                document.getElementById('submitLoading').style.display = 'none';
+                document.getElementById('submitBtn').disabled = false;
+            }
+        }
+
+        // =========================================================
+        // 5. DASHBOARD FUNCTIONS
+        // =========================================================
+        function loadDashboard() {
+            if (!window.firebaseModules) {
+                setTimeout(loadDashboard, 1000);
+                return;
+            }
+
+            const { db, collection, query, orderBy, onSnapshot } = window.firebaseModules;
+            const applicationsRef = collection(db, "applications");
+            
+            const q = query(applicationsRef, orderBy('timestamp', 'desc'));
+            
+            onSnapshot(q, (snapshot) => {
+                allApplications = [];
+                const dashboardDiv = document.getElementById('dailyDashboard');
+                
+                if (snapshot.empty) {
+                    dashboardDiv.innerHTML = '<p class="text-center text-muted">No applications found.</p>';
+                    return;
+                }
+
+                let groupedData = {};
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const id = doc.id;
+                    const date = data.submittedDate || 'No Date';
+                    
+                    if (!groupedData[date]) {
+                        groupedData[date] = [];
+                    }
+                    groupedData[date].push({ id, ...data });
+                    allApplications.push({ id, ...data });
+                });
+
+                const sortedDates = Object.keys(groupedData).sort().reverse();
+                let html = '';
+
+                sortedDates.forEach(date => {
+                    const entries = groupedData[date];
+                    html += `
+                        <div class="date-group">
+                            <div class="date-header">
+                                <h5>📅 ${date} <span class="badge bg-secondary ms-2">${entries.length} Letters</span></h5>
+                                <button class="btn btn-sm btn-primary" onclick="exportDateDocx('${date}')">
+                                    Download All
+                                </button>
+                            </div>
+                            <ul class="list-group mt-2">
+                                ${entries.map(entry => `
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        ${entry.applicantName} - PKR ${entry.advanceAmount.toLocaleString('en-PK')}
+                                        <button class="btn btn-sm btn-outline-info" onclick="downloadSingleApplication('${entry.id}')">
+                                            Download
+                                        </button>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                });
+
+                dashboardDiv.innerHTML = html;
+                
+            }, (error) => {
+                console.error("Dashboard error:", error);
+                document.getElementById('dailyDashboard').innerHTML = 
+                    '<p class="text-center text-danger">Error loading applications</p>';
+            });
+        }
+
+        async function downloadSingleApplication(appId) {
+            const app = allApplications.find(a => a.id === appId);
+            if (app) {
+                currentFormData = app;
+                await generateDocx();
+            }
+        }
+
+        function exportDateDocx(date) {
+            const entries = allApplications.filter(app => app.submittedDate === date);
+            alert(`Would generate ${entries.length} documents for ${date}`);
+            // Implement date-wise export here
+        }
+
+        function exportAllToDocx() {
+            if (allApplications.length === 0) {
+                alert("No applications to export.");
+                return;
+            }
+            alert(`Would generate ${allApplications.length} documents`);
+        }
+
+        function exportToExcel() {
+            if (allApplications.length === 0) {
+                alert("No applications to export.");
+                return;
+            }
+            
+            const headers = ["Date", "Name", "Rank", "Belt No", "CNIC", "GP Fund No", "Amount", "Installments", "Monthly"];
+            const csvData = allApplications.map(app => [
+                app.submittedDate || 'N/A',
+                app.applicantName,
+                app.rank,
+                app.beltNo,
+                app.cnic,
+                app.gpFundNo,
+                app.advanceAmount,
+                app.installments,
+                app.monthlyInstallment
+            ]);
+            
+            const csv = [headers, ...csvData].map(row => row.join(",")).join("\n");
+            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `applications_export_${new Date().getTime()}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('✅ Excel file downloaded!');
+        }
+
+        function clearForm() {
+            document.getElementById('advanceForm').reset();
+            updateCalculations();
+            currentFormData = null;
+        }
+
+        // =========================================================
+        // 6. INITIALIZATION
+        // =========================================================
+        window.onload = () => {
+            updateCalculations();
+            
+            // Wait for Firebase to initialize
+            const checkFirebase = setInterval(() => {
+                if (window.firebaseModules) {
+                    clearInterval(checkFirebase);
+                    loadDashboard();
+                }
+            }, 100);
+            
+            // Set up event listeners
+            document.getElementById('totalBalance').addEventListener('input', updateCalculations);
+        };
+    </script>
+</body>
+</html>

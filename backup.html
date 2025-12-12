@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welfare Document System - Connected</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+
+    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.47.0/docxtemplater.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        .main-container { max-width: 1200px; margin: 40px auto; }
+        .card-custom { border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); background: #fff; margin-bottom: 30px; overflow: hidden; }
+        .card-header-custom { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; padding: 20px; font-weight: 600; font-size: 1.25rem; }
+        .calculated-field { background-color: #eef2f7; color: #0d6efd; font-weight: 700; border: 1px solid #dee2e6; }
+        .btn-custom-lg { padding: 12px 30px; font-size: 1.1rem; border-radius: 8px; }
+        .dashboard-list { max-height: 600px; overflow-y: auto; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; }
+    </style>
+</head>
+<body>
+
+    <div id="loader" class="loading-overlay">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h5 class="mt-3 text-primary" id="loaderText">Processing...</h5>
+    </div>
+
+    <div class="main-container px-3">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold text-dark"><i class="fas fa-file-signature text-primary"></i> GP Fund Automation System</h2>
+            <p class="text-muted">Connected to Live Database</p>
+        </div>
+        
+        <div class="card card-custom">
+            <div class="card-header-custom"><i class="fas fa-edit me-2"></i> New Application Entry</div>
+            <div class="card-body p-4">
+                <form id="advanceForm" oninput="window.updateCalculations()">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Applicant Name</label>
+                            <input type="text" class="form-control" id="applicantName" required placeholder="e.g. Ali Khan">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rank / Designation</label>
+                            <input type="text" class="form-control" id="rank" required placeholder="e.g. Constable">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Belt No</label>
+                            <input type="text" class="form-control" id="beltNo" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">CNIC Number</label>
+                            <input type="text" class="form-control" id="cnic" maxlength="15" required onkeyup="window.validateCNIC(this)" placeholder="35202-1234567-1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">GP Fund Account No</label>
+                            <input type="text" class="form-control" id="gpFundNo" required>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4 text-muted">
+
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label text-dark fw-bold">Total GP Balance (PKR)</label>
+                            <input type="number" class="form-control border-primary" id="totalBalance" min="1" step="1" required placeholder="Enter Balance">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Withdrawal Amount</label>
+                            <div id="advanceAmountDisplay" class="form-control calculated-field">0</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Installments (Months)</label>
+                            <div id="installmentsDisplay" class="form-control calculated-field">0</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Monthly Installment</label>
+                            <div id="monthlyInstallment" class="form-control calculated-field">0</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Amount in Words</label>
+                            <div id="advanceAmountWords" class="form-control calculated-field text-secondary">Zero Only</div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="button" class="btn btn-success btn-custom-lg shadow-sm" onclick="window.saveAndGenerate()">
+                            <i class="fas fa-save me-2"></i> Submit Data & Generate Letter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card card-custom">
+            <div class="card-header-custom d-flex justify-content-between align-items-center bg-dark">
+                <span><i class="fas fa-database me-2"></i> Live Database Records</span>
+                <div>
+                    <button class="btn btn-light btn-sm me-2" onclick="window.generateMasterExcel()">
+                        <i class="fas fa-file-excel text-success"></i> Export Excel
+                    </button>
+                    <button class="btn btn-light btn-sm" onclick="window.downloadAllZip()">
+                        <i class="fas fa-file-archive text-warning"></i> Download All (Zip)
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0 dashboard-list">
+                <div id="dailyDashboard" class="list-group list-group-flush">
+                    <div class="p-4 text-center text-muted">
+                        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                        Connecting to Firebase...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+        // --- 1. CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpaMthWl0eQwYXN-wt09fv_OqS4iUVxLA",
+            authDomain: "welfare-das.firebaseapp.com",
+            projectId: "welfare-das",
+            storageBucket: "welfare-das.firebasestorage.app",
+            messagingSenderId: "783240912416",
+            appId: "1:783240912416:web:c08bfe399359675c0aa645"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const COLL_NAME = "applications";
+
+        // --- 2. GLOBAL STATE & CONSTANTS ---
+        const CONSTANTS = { MIN_INST: 28, MAX_INST: 36, MIN_PERC: 0.75, MAX_PERC: 0.80 };
+        let currentFormData = {
+            ApplicantName: '', BeltNo: '', CNIC: '', AccountNo: '', Rank: '', 
+            TotalBalance: 0, AdvanceAmount: 0, AmountWords: 'Zero Only',
+            Installments: 0, MonthlyInstallment: 0, Percentage: 0
+        };
+
+        // --- 3. HELPER FUNCTIONS (Exposed to Window) ---
+
+        window.showLoader = (text) => {
+            document.getElementById('loaderText').innerText = text;
+            document.getElementById('loader').style.display = 'flex';
+        };
+
+        window.hideLoader = () => {
+            document.getElementById('loader').style.display = 'none';
+        };
+
+        window.validateCNIC = (input) => {
+            const val = input.value;
+            if (val.length === 5 && val.charAt(4) !== '-') input.value = val.slice(0, 5) + '-' + val.slice(5);
+            if (val.length === 13 && val.charAt(12) !== '-') input.value = val.slice(0, 13) + '-' + value.slice(13);
+        };
+
+        window.numberToWordsPakistani = (n) => {
+            if (!n || n === 0) return "Zero Only";
+            // Simple approach for functionality, can be expanded
+            return n.toLocaleString('en-US') + " (Rupees) Only"; 
+        };
+
+        window.updateCalculations = () => {
+            const balance = parseInt(document.getElementById('totalBalance').value) || 0;
+            if (balance <= 0) {
+                resetFormCalc();
+                return;
+            }
+
+            // Logic: Find best integer monthly installment between 28-36 months for 75-80% amount
+            let best = { advance: 0, months: 0, monthly: 0, perc: 0 };
+            const minAmt = Math.ceil(balance * CONSTANTS.MIN_PERC);
+            const maxAmt = Math.floor(balance * CONSTANTS.MAX_PERC);
+
+            outerLoop:
+            for (let amt = maxAmt; amt >= minAmt; amt--) {
+                for (let m = CONSTANTS.MAX_INST; m >= CONSTANTS.MIN_INST; m--) {
+                    if (amt % m === 0) { // Check if perfectly divisible
+                        best = { advance: amt, months: m, monthly: amt / m, perc: (amt/balance*100).toFixed(2) };
+                        break outerLoop;
+                    }
+                }
+            }
+
+            // Update State
+            currentFormData.TotalBalance = balance;
+            currentFormData.AdvanceAmount = best.advance;
+            currentFormData.Installments = best.months;
+            currentFormData.MonthlyInstallment = best.monthly;
+            currentFormData.Percentage = best.perc;
+            currentFormData.AmountWords = window.numberToWordsPakistani(best.advance);
+
+            // Update UI
+            document.getElementById('advanceAmountDisplay').textContent = best.advance.toLocaleString('en-PK');
+            document.getElementById('installmentsDisplay').textContent = best.months;
+            document.getElementById('monthlyInstallment').textContent = best.monthly.toLocaleString('en-PK');
+            document.getElementById('advanceAmountWords').textContent = currentFormData.AmountWords;
+        };
+
+        function resetFormCalc() {
+            document.getElementById('advanceAmountDisplay').textContent = "0";
+            document.getElementById('installmentsDisplay').textContent = "0";
+            document.getElementById('monthlyInstallment').textContent = "0";
+            currentFormData.AdvanceAmount = 0;
+        }
+
+        // --- 4. CORE ACTIONS (Save, Excel, Zip) ---
+
+        // A. SAVE & GENERATE SINGLE
+        window.saveAndGenerate = async () => {
+            const form = document.getElementById('advanceForm');
+            if (!form.checkValidity()) {
+                alert("Please fill all fields correctly.");
+                return;
+            }
+            if (currentFormData.AdvanceAmount === 0) {
+                alert("Calculation invalid. Check Total Balance.");
+                return;
+            }
+
+            // Collect Text Inputs
+            currentFormData.ApplicantName = document.getElementById('applicantName').value;
+            currentFormData.Rank = document.getElementById('rank').value;
+            currentFormData.BeltNo = document.getElementById('beltNo').value;
+            currentFormData.CNIC = document.getElementById('cnic').value;
+            currentFormData.AccountNo = document.getElementById('gpFundNo').value;
+
+            window.showLoader("Saving to Database...");
+
+            try {
+                // 1. Save to Firestore
+                const docRef = await addDoc(collection(db, COLL_NAME), {
+                    ...currentFormData,
+                    createdDate: new Date().toISOString().split('T')[0],
+                    timestamp: new Date()
+                });
+
+                // 2. Generate DOCX
+                window.showLoader("Generating Word File...");
+                await generateDocxBlob(currentFormData, true); // true = trigger download
+                
+                alert("✅ Success! Data saved and Letter generated.");
+                form.reset();
+                resetFormCalc();
+
+            } catch (error) {
+                console.error(error);
+                alert("Error: " + error.message);
+            } finally {
+                window.hideLoader();
+            }
+        };
+
+        // B. EXPORT EXCEL (Replaces backend alert)
+        window.generateMasterExcel = async () => {
+            window.showLoader("Fetching all records...");
+            try {
+                const q = query(collection(db, COLL_NAME), orderBy("timestamp", "desc"));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) { alert("No data to export."); return; }
+
+                const data = [];
+                querySnapshot.forEach(doc => {
+                    const d = doc.data();
+                    data.push({
+                        "Date": d.createdDate,
+                        "Name": d.ApplicantName,
+                        "Rank": d.Rank,
+                        "Belt No": d.BeltNo,
+                        "CNIC": d.CNIC,
+                        "GP Fund No": d.AccountNo,
+                        "Total Balance": d.TotalBalance,
+                        "Withdrawal": d.AdvanceAmount,
+                        "Monthly Inst": d.MonthlyInstallment,
+                        "Months": d.Installments
+                    });
+                });
+
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Applications");
+                XLSX.writeFile(wb, "GP_Fund_Master_Sheet.xlsx");
+
+            } catch (error) {
+                alert("Excel Error: " + error.message);
+            } finally {
+                window.hideLoader();
+            }
+        };
+
+        // C. DOWNLOAD ALL ZIP (Replaces merge alert)
+        window.downloadAllZip = async () => {
+            window.showLoader("Preparing Zip (This may take time)...");
+            try {
+                const zip = new JSZip();
+                const q = query(collection(db, COLL_NAME), orderBy("timestamp", "desc"));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) { alert("No files to zip."); return; }
+
+                // Fetch template once
+                const response = await fetch('template.docx');
+                if (!response.ok) throw new Error("Template not found");
+                const templateBuffer = await response.arrayBuffer();
+
+                // Process each document
+                let count = 0;
+                const docs = [];
+                querySnapshot.forEach(d => docs.push(d.data()));
+
+                for (const data of docs) {
+                    const blob = generateDocxFromBuffer(templateBuffer, data);
+                    const safeName = data.ApplicantName.replace(/[^a-z0-9]/gi, '_');
+                    zip.file(`${safeName}_${data.BeltNo}.docx`, blob);
+                    count++;
+                }
+
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, `All_Applications_${new Date().toISOString().split('T')[0]}.zip`);
+
+            } catch (error) {
+                console.error(error);
+                alert("Zip Error: " + error.message);
+            } finally {
+                window.hideLoader();
+            }
+        };
+
+        // --- 5. DOC GENERATION UTILS ---
+
+        // Helper to generate blob from data
+        async function generateDocxBlob(data, autoDownload = false) {
+            const response = await fetch('template.docx');
+            if (!response.ok) throw new Error("Template file 'template.docx' missing in folder.");
+            const content = await response.arrayBuffer();
+            return generateDocxFromBuffer(content, data, autoDownload);
+        }
+
+        // Helper to process buffer
+        function generateDocxFromBuffer(content, data, autoDownload = false) {
+            const zip = new PizZip(content);
+            const doc = new docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+            
+            // Format numbers for clean template output
+            const formattedData = {
+                ...data,
+                AdvanceAmount: Number(data.AdvanceAmount).toLocaleString('en-PK'),
+                TotalBalance: Number(data.TotalBalance).toLocaleString('en-PK'),
+                MonthlyInstallment: Number(data.MonthlyInstallment).toLocaleString('en-PK')
+            };
+
+            doc.setData(formattedData);
+            doc.render();
+
+            const out = doc.getZip().generate({
+                type: "blob",
+                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            });
+
+            if (autoDownload) {
+                saveAs(out, `GP_App_${data.ApplicantName.replace(/\s/g, '_')}.docx`);
+            }
+            return out;
+        }
+
+        // --- 6. REAL-TIME DASHBOARD ---
+        function initDashboard() {
+            const listDiv = document.getElementById('dailyDashboard');
+            const q = query(collection(db, COLL_NAME), orderBy("timestamp", "desc"));
+
+            onSnapshot(q, (snapshot) => {
+                listDiv.innerHTML = '';
+                if (snapshot.empty) {
+                    listDiv.innerHTML = '<div class="p-4 text-center text-muted">No records found. Add new entry.</div>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const item = document.createElement('a');
+                    item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3';
+                    item.href = '#';
+                    item.onclick = () => generateDocxBlob(d, true); // Click to download again
+                    item.innerHTML = `
+                        <div>
+                            <h6 class="mb-1 text-primary fw-bold">${d.ApplicantName} <span class="badge bg-secondary ms-2">${d.Rank}</span></h6>
+                            <small class="text-muted"><i class="fas fa-calendar-alt"></i> ${d.createdDate} | <strong>Amount:</strong> ${Number(d.AdvanceAmount).toLocaleString()} | <strong>Belt:</strong> ${d.BeltNo}</small>
+                        </div>
+                        <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i> Saved</span>
+                    `;
+                    listDiv.appendChild(item);
+                });
+            });
+        }
+
+        // Start App
+        initDashboard();
+
+    </script>
+</body>
+</html>
