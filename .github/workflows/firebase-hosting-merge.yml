@@ -11,6 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # ← IMPORTANT ADDITION
+      
+      - name: Debug List Files
+        run: |
+          pwd
+          ls -la
+          ls -la public/ || echo "public folder not found"
+      
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
