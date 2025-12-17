@@ -699,29 +699,35 @@
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
                 
-                // Initialize docxtemplater (using default delimiters { })
+                // Initialize docxtemplater with custom delimiters
                 const doc = new docxtemplater(zip, {
                     paragraphLoop: true,
-                    linebreaks: true
+                    linebreaks: true,
+                    delimiters: {
+                        start: '{{',
+                        end: '}}'
+                    }
                 });
                 
-                // Prepare data for template
+                // Prepare data for template as array for loop
                 const [year, month, day] = application.dateStr.split('-');
                 const templateData = {
-                    ApplicantName: application.name,
-                    Rank: application.rank,
-                    BeltNo: application.belt,
-                    CNIC: application.cnic,
-                    AccountNo: application.account,
-                    TotalBalance: Number(application.balance).toLocaleString(),
-                    AdvanceAmount: Number(application.advance).toLocaleString(),
-                    AmountWords: application.words,
-                    MonthlyInstallment: Number(application.monthly).toLocaleString(),
-                    Installments: application.installments,
-                    Percentage: application.percentage,
-                    day: day,
-                    month: month,
-                    year: year
+                    req: [{
+                        ApplicantName: application.name,
+                        Rank: application.rank,
+                        BeltNo: application.belt,
+                        CNIC: application.cnic,
+                        AccountNo: application.account,
+                        TotalBalance: Number(application.balance).toLocaleString(),
+                        AdvanceAmount: Number(application.advance).toLocaleString(),
+                        AmountWords: application.words,
+                        MonthlyInstallment: Number(application.monthly).toLocaleString(),
+                        Installments: application.installments,
+                        Percentage: application.percentage,
+                        day: day,
+                        month: month,
+                        year: year
+                    }]
                 };
                 
                 console.log("Template data prepared:", templateData);
@@ -780,10 +786,14 @@
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
                 
-                // Initialize docxtemplater (using default delimiters { })
+                // Initialize docxtemplater with custom delimiters
                 const doc = new docxtemplater(zip, {
                     paragraphLoop: true,
-                    linebreaks: true
+                    linebreaks: true,
+                    delimiters: {
+                        start: '{{',
+                        end: '}}'
+                    }
                 });
                 
                 // Prepare data array for loop
