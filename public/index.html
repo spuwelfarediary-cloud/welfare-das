@@ -391,14 +391,14 @@
 
     <!-- Firebase SDK -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyCpaMthWl0eQwYXN-wt09fv_OqS4iUVxLA",
             authDomain: "welfare-das.firebaseapp.com",
             projectId: "welfare-das",
-            storageBucket: "welfare-das.firebasestorage.app",
+            storageBucket: "welfare-das.appspot.com",
             messagingSenderId: "783240912416",
             appId: "1:783240912416:web:86c8b859e1b7162d0aa645",
             measurementId: "G-FGRCLWVY6B"
@@ -673,31 +673,24 @@
         // ===== WORD DOCUMENT GENERATION =====
         // Helper function to load template
         async function loadTemplate() {
-            // Try multiple possible template locations
-            const templatePaths = [
-                'template.docx',
-                './template.docx',
-                '/template.docx'
-            ];
+            // Replace with your actual GitHub raw URL, e.g., 'https://raw.githubusercontent.com/YOURUSERNAME/YOURREPO/main/template.docx'
+            const templateUrl = 'https://github.com/spuwelfarediary-cloud/welfare-das/blob/main/public/template.docx'; // Change to raw URL for production, e.g., 'https://raw.githubusercontent.com/yourusername/yourrepo/main/template.docx'
             
-            for (const path of templatePaths) {
-                try {
-                    console.log(`Trying to load template from: ${path}`);
-                    const response = await fetch(path);
-                    
-                    if (response.ok) {
-                        const templateFile = await response.arrayBuffer();
-                        console.log(`✅ Template loaded successfully from: ${path}`);
-                        return templateFile;
-                    } else {
-                        console.warn(`Template not found at: ${path}`);
-                    }
-                } catch (err) {
-                    console.warn(`Error loading template from ${path}:`, err.message);
+            try {
+                console.log(`Trying to load template from: ${templateUrl}`);
+                const response = await fetch(templateUrl);
+                
+                if (response.ok) {
+                    const templateFile = await response.arrayBuffer();
+                    console.log('✅ Template loaded successfully');
+                    return templateFile;
+                } else {
+                    throw new Error('Template not found: ' + response.status);
                 }
+            } catch (err) {
+                console.error('Error loading template: ', err);
+                throw err;
             }
-            
-            throw new Error('Template not found in any location. Please make sure template.docx is in the same folder as index.html');
         }
 
         async function generateWordDocument(application, docId) {
@@ -710,26 +703,33 @@
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
                 
-                // Initialize docxtemplater
+                // Initialize docxtemplater with custom delimiters for {{ }}
                 const doc = new docxtemplater(zip, {
                     paragraphLoop: true,
                     linebreaks: true,
+                    delimiters: {
+                        start: '{{',
+                        end: '}}'
+                    }
                 });
                 
                 // Prepare data for template
+                const [year, month, day] = application.dateStr.split('-');
                 const templateData = {
-                    name: application.name,
-                    rank: application.rank,
-                    belt: application.belt,
-                    cnic: application.cnic,
-                    account: application.account,
-                    balance: Number(application.balance).toLocaleString(),
-                    advance: Number(application.advance).toLocaleString(),
-                    words: application.words,
-                    monthly: Number(application.monthly).toLocaleString(),
-                    inst: application.installments,
-                    percentage: application.percentage,
-                    date: application.dateStr
+                    ApplicantName: application.name,
+                    Rank: application.rank,
+                    BeltNo: application.belt,
+                    CNIC: application.cnic,
+                    AccountNo: application.account,
+                    TotalBalance: Number(application.balance).toLocaleString(),
+                    AdvanceAmount: Number(application.advance).toLocaleString(),
+                    AmountWords: application.words,
+                    MonthlyInstallment: Number(application.monthly).toLocaleString(),
+                    Installments: application.installments,
+                    Percentage: application.percentage,
+                    day: day,
+                    month: month,
+                    year: year
                 };
                 
                 console.log("Template data prepared:", templateData);
@@ -788,28 +788,37 @@
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
                 
-                // Initialize docxtemplater with loop
+                // Initialize docxtemplater with custom delimiters
                 const doc = new docxtemplater(zip, {
                     paragraphLoop: true,
                     linebreaks: true,
+                    delimiters: {
+                        start: '{{',
+                        end: '}}'
+                    }
                 });
                 
                 // Prepare data array for loop
                 const templateData = {
-                    req: filtered.map(app => ({
-                        name: app.name,
-                        rank: app.rank,
-                        belt: app.belt,
-                        cnic: app.cnic,
-                        account: app.account,
-                        balance: Number(app.balance).toLocaleString(),
-                        advance: Number(app.advance).toLocaleString(),
-                        words: app.words,
-                        monthly: Number(app.monthly).toLocaleString(),
-                        inst: app.installments,
-                        percentage: app.percentage,
-                        date: app.dateStr
-                    }))
+                    req: filtered.map(app => {
+                        const [year, month, day] = app.dateStr.split('-');
+                        return {
+                            ApplicantName: app.name,
+                            Rank: app.rank,
+                            BeltNo: app.belt,
+                            CNIC: app.cnic,
+                            AccountNo: app.account,
+                            TotalBalance: Number(app.balance).toLocaleString(),
+                            AdvanceAmount: Number(app.advance).toLocaleString(),
+                            AmountWords: app.words,
+                            MonthlyInstallment: Number(app.monthly).toLocaleString(),
+                            Installments: app.installments,
+                            Percentage: app.percentage,
+                            day: day,
+                            month: month,
+                            year: year
+                        };
+                    })
                 };
                 
                 console.log(`Batch data prepared for ${filtered.length} applications`);
@@ -845,14 +854,13 @@
 
         // Fallback function if template not found
         function generateFallbackDocument(application, docId) {
+            const [year, month, day] = application.dateStr.split('-');
             const letterContent = `
 Government of the Punjab
 Police Department
 
-No. /Acct/SPU Dated ${application.dateStr}
-
+No.                       ${settings.letterPrefix}                     	             Dated ${day} / ${month} / ${year}
 ORDER:
-
 In exercise of the powers vested in me under Rule.1.14(1)(a)(iv)(d)(i) of the Punjab Provident Fund Rules, 1978, sanction is hereby accorded to the grant of refundable advance of Rs.${application.advance}/- (Rupees ${application.words}) in respect of Mr. ${application.name} ${application.rank} ${application.belt} of Special Protection Unit (SPU) Punjab Lahore from his G.P. Fund Account as mentioned in his G.P. Fund/Personal Account No. ${application.account} and CNIC No. ${application.cnic} For construction/repairing of his house.
 
 The amount is approximately equal to ${application.percentage}% of the balance at his credit in his G.P. Fund account Rs. ${application.balance}/-.
@@ -866,7 +874,7 @@ for Director/Deputy Inspector General of Police,
 Special Protection Unit,
 Punjab, Lahore.
 
-No. /Acct/SPU Dated /${application.year}
+No. /Acct/SPU Dated /${year}
 
 A copy is forwarded for information and necessary action to the:-
 
@@ -887,6 +895,7 @@ Punjab, Lahore.
         function generateFallbackBatchDocument(filtered, date) {
             let combinedContent = '';
             filtered.forEach((app, index) => {
+                const [year, month, day] = app.dateStr.split('-');
                 combinedContent += `LETTER ${index + 1}\n`;
                 combinedContent += `Date: ${app.dateStr}\n\n`;
                 
@@ -894,10 +903,8 @@ Punjab, Lahore.
 Government of the Punjab
 Police Department
 
-No. /Acct/SPU Dated ${app.dateStr}
-
+No.                       ${settings.letterPrefix}                     	             Dated ${day} / ${month} / ${year}
 ORDER:
-
 In exercise of the powers vested in me under Rule.1.14(1)(a)(iv)(d)(i) of the Punjab Provident Fund Rules, 1978, sanction is hereby accorded to the grant of refundable advance of Rs.${app.advance}/- (Rupees ${app.words}) in respect of Mr. ${app.name} ${app.rank} ${app.belt} of Special Protection Unit (SPU) Punjab Lahore from his G.P. Fund Account as mentioned in his G.P. Fund/Personal Account No. ${app.account} and CNIC No. ${app.cnic} For construction/repairing of his house.
 
 The amount is approximately equal to ${app.percentage}% of the balance at his credit in his G.P. Fund account Rs. ${app.balance}/-.
@@ -911,7 +918,7 @@ for Director/Deputy Inspector General of Police,
 Special Protection Unit,
 Punjab, Lahore.
 
-No. /Acct/SPU Dated /${app.year}
+No. /Acct/SPU Dated /${year}
 
 A copy is forwarded for information and necessary action to the:-
 
