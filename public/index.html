@@ -673,25 +673,24 @@
         // ===== WORD DOCUMENT GENERATION =====
         // Helper function to load template
         async function loadTemplate() {
-            // Replace with your actual GitHub raw URL, e.g., 'https://raw.githubusercontent.com/YOURUSERNAME/YOURREPO/main/template.docx'
-            const templateUrl = 'https://github.com/spuwelfarediary-cloud/welfare-das/blob/main/public/template.docx'; // Change to raw URL for production, e.g., 'https://raw.githubusercontent.com/yourusername/yourrepo/main/template.docx'
-            
-            try {
-                console.log(`Trying to load template from: ${templateUrl}`);
-                const response = await fetch(templateUrl);
-                
-                if (response.ok) {
-                    const templateFile = await response.arrayBuffer();
-                    console.log('✅ Template loaded successfully');
-                    return templateFile;
-                } else {
-                    throw new Error('Template not found: ' + response.status);
-                }
-            } catch (err) {
-                console.error('Error loading template: ', err);
-                throw err;
-            }
+    const templateUrl = 'https://raw.githubusercontent.com/spuwelfarediary-cloud/welfare-das/main/public/template.docx';
+    
+    try {
+        console.log(`Trying to load template from: ${templateUrl}`);
+        const response = await fetch(templateUrl);
+        
+        if (response.ok) {
+            const templateFile = await response.arrayBuffer();
+            console.log('✅ Template loaded successfully');
+            return templateFile;
+        } else {
+            throw new Error('Template not found: ' + response.status);
         }
+    } catch (err) {
+        console.error('Error loading template: ', err);
+        throw err;
+    }
+}
 
         async function generateWordDocument(application, docId) {
             try {
