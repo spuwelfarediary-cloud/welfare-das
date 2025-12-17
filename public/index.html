@@ -670,12 +670,42 @@
             }
         }
 
-        // ===== WORD DOCUMENT GENERATION USING TEMPLATE =====
+        // ===== WORD DOCUMENT GENERATION =====
+        // Helper function to load template
+        async function loadTemplate() {
+            // Try multiple possible template locations
+            const templatePaths = [
+                'template.docx',
+                './template.docx',
+                '/template.docx'
+            ];
+            
+            for (const path of templatePaths) {
+                try {
+                    console.log(`Trying to load template from: ${path}`);
+                    const response = await fetch(path);
+                    
+                    if (response.ok) {
+                        const templateFile = await response.arrayBuffer();
+                        console.log(`✅ Template loaded successfully from: ${path}`);
+                        return templateFile;
+                    } else {
+                        console.warn(`Template not found at: ${path}`);
+                    }
+                } catch (err) {
+                    console.warn(`Error loading template from ${path}:`, err.message);
+                }
+            }
+            
+            throw new Error('Template not found in any location. Please make sure template.docx is in the same folder as index.html');
+        }
+
         async function generateWordDocument(application, docId) {
             try {
-                // Load the template
-                const response = await fetch('template.docx');
-                const templateFile = await response.arrayBuffer();
+                console.log("Generating Word document...");
+                
+                // Load template
+                const templateFile = await loadTemplate();
                 
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
@@ -702,6 +732,8 @@
                     date: application.dateStr
                 };
                 
+                console.log("Template data prepared:", templateData);
+                
                 // Set the template variables
                 doc.setData(templateData);
                 
@@ -714,15 +746,22 @@
                     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 });
                 
+                // Create filename
+                const filename = `GP_Advance_${application.name.replace(/\s+/g, '_')}_${application.dateStr}.docx`;
+                
                 // Save the file
-                saveAs(out, `GP_Advance_${application.name.replace(/\s+/g, '_')}_${application.dateStr}.docx`);
+                saveAs(out, filename);
+                
+                console.log(`✅ Word document generated: ${filename}`);
+                return true;
                 
             } catch (error) {
-                console.error("Error generating Word document:", error);
-                alert("Error generating document. Please check if template.docx exists.");
+                console.error("❌ Error generating Word document:", error);
                 
-                // Fallback to simple text if template not found
+                // Fallback to simple text document
+                console.log("Using fallback text document...");
                 generateFallbackDocument(application, docId);
+                return false;
             }
         }
 
@@ -741,9 +780,10 @@
             }
             
             try {
-                // Load the template
-                const response = await fetch('template.docx');
-                const templateFile = await response.arrayBuffer();
+                console.log(`Generating batch document for ${filtered.length} applications...`);
+                
+                // Load template
+                const templateFile = await loadTemplate();
                 
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
@@ -772,6 +812,8 @@
                     }))
                 };
                 
+                console.log(`Batch data prepared for ${filtered.length} applications`);
+                
                 // Set the template variables
                 doc.setData(templateData);
                 
@@ -784,14 +826,19 @@
                     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 });
                 
+                // Create filename
+                const filename = `GP_Advance_Batch_${date}_(${filtered.length}_Letters).docx`;
+                
                 // Save the file
-                saveAs(out, `GP_Advance_Batch_${date}_(${filtered.length}_Letters).docx`);
+                saveAs(out, filename);
+                
+                console.log(`✅ Batch Word document generated: ${filename}`);
                 
             } catch (error) {
-                console.error("Error generating batch Word document:", error);
-                alert("Error generating batch document. Using fallback method.");
+                console.error("❌ Error generating batch Word document:", error);
                 
                 // Fallback to simple batch document
+                console.log("Using fallback batch text document...");
                 generateFallbackBatchDocument(filtered, date);
             }
         }
@@ -829,10 +876,12 @@ Additional Director Admin/DDO,
 for Director/Deputy Inspector General of Police,
 Special Protection Unit,
 Punjab, Lahore.
-    `.trim();
-    
+            `.trim();
+            
             const blob = new Blob([letterContent], { type: 'text/plain' });
-            saveAs(blob, `GP_Advance_${application.name.replace(/\s+/g, '_')}_${application.dateStr}.txt`);
+            const filename = `GP_Advance_${application.name.replace(/\s+/g, '_')}_${application.dateStr}.txt`;
+            saveAs(blob, filename);
+            console.log(`Fallback text document generated: ${filename}`);
         }
 
         function generateFallbackBatchDocument(filtered, date) {
@@ -872,13 +921,15 @@ Additional Director Admin/DDO,
 for Director/Deputy Inspector General of Police,
 Special Protection Unit,
 Punjab, Lahore.
-        `.trim();
+                `.trim();
                 
                 combinedContent += '\n\n' + '='.repeat(80) + '\n\n';
             });
             
             const blob = new Blob([combinedContent], { type: 'text/plain' });
-            saveAs(blob, `GP_Advance_Batch_${date}_(${filtered.length}_Letters).txt`);
+            const filename = `GP_Advance_Batch_${date}_(${filtered.length}_Letters).txt`;
+            saveAs(blob, filename);
+            console.log(`Fallback batch text document generated: ${filename}`);
         }
 
         // ===== EXCEL EXPORT =====
