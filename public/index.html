@@ -283,7 +283,7 @@
 
                             <div class="col-12 mt-4">
                                 <button type="button" class="btn btn-primary btn-lg w-100" onclick="saveApplication()">
-                                    <i class="fas fa-save"></i> Save Application & Generate Letter
+                                    <i class="fas fa-save"></i> Submit Application
                                 </button>
                             </div>
                         </div>
@@ -644,15 +644,12 @@
                 
                 console.log("Document written with ID: ", docRef.id);
                 
-                // Generate Word document using template
-                await generateWordDocument(applicationData, docRef.id);
-                
                 // Reset form
                 document.getElementById('entryForm').reset();
                 resetCalculatedFields();
                 
                 // Show success
-                alert("✅ Application saved successfully! Word document has been downloaded.");
+                alert("✅ Application saved successfully!");
                 
                 // Switch to dashboard
                 switchTab('dashboard');
@@ -664,7 +661,7 @@
                 // Reset button
                 const saveBtn = document.querySelector('#new-entry-tab button');
                 if(saveBtn) {
-                    saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Application & Generate Letter';
+                    saveBtn.innerHTML = '<i class="fas fa-save"></i> Submit Application';
                     saveBtn.disabled = false;
                 }
             }
@@ -673,24 +670,24 @@
         // ===== WORD DOCUMENT GENERATION =====
         // Helper function to load template
         async function loadTemplate() {
-    const templateUrl = 'https://raw.githubusercontent.com/spuwelfarediary-cloud/welfare-das/main/public/template.docx';
-    
-    try {
-        console.log(`Trying to load template from: ${templateUrl}`);
-        const response = await fetch(templateUrl);
-        
-        if (response.ok) {
-            const templateFile = await response.arrayBuffer();
-            console.log('✅ Template loaded successfully');
-            return templateFile;
-        } else {
-            throw new Error('Template not found: ' + response.status);
+            const templateUrl = 'https://raw.githubusercontent.com/spuwelfarediary-cloud/welfare-das/main/public/template.docx';
+            
+            try {
+                console.log(`Trying to load template from: ${templateUrl}`);
+                const response = await fetch(templateUrl);
+                
+                if (response.ok) {
+                    const templateFile = await response.arrayBuffer();
+                    console.log('✅ Template loaded successfully');
+                    return templateFile;
+                } else {
+                    throw new Error('Template not found: ' + response.status);
+                }
+            } catch (err) {
+                console.error('Error loading template: ', err);
+                throw err;
+            }
         }
-    } catch (err) {
-        console.error('Error loading template: ', err);
-        throw err;
-    }
-}
 
         async function generateWordDocument(application, docId) {
             try {
@@ -702,14 +699,10 @@
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
                 
-                // Initialize docxtemplater with custom delimiters for {{ }}
+                // Initialize docxtemplater (using default delimiters { })
                 const doc = new docxtemplater(zip, {
                     paragraphLoop: true,
-                    linebreaks: true,
-                    delimiters: {
-                        start: '{{',
-                        end: '}}'
-                    }
+                    linebreaks: true
                 });
                 
                 // Prepare data for template
@@ -787,14 +780,10 @@
                 // Initialize PizZip with the template
                 const zip = new PizZip(templateFile);
                 
-                // Initialize docxtemplater with custom delimiters
+                // Initialize docxtemplater (using default delimiters { })
                 const doc = new docxtemplater(zip, {
                     paragraphLoop: true,
-                    linebreaks: true,
-                    delimiters: {
-                        start: '{{',
-                        end: '}}'
-                    }
+                    linebreaks: true
                 });
                 
                 // Prepare data array for loop
